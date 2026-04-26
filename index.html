@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distributed Transactions — The Complete Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@400;500&family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181b22;
+    --border: #22262f;
+    --accent: #e8ff5a;
+    --accent2: #5affce;
+    --accent3: #ff6b6b;
+    --accent4: #7b8cff;
+    --text: #e2e4eb;
+    --muted: #6b7280;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-body: 'Lora', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 48px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 40%, rgba(232,255,90,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 80%, rgba(90,255,206,0.05) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .hero-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.1s forwards;
+  }
+
+  .hero h1 {
+    font-family: var(--font-head);
+    font-weight: 800;
+    font-size: clamp(40px, 7vw, 96px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.2s forwards;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero-desc {
+    max-width: 560px;
+    color: var(--muted);
+    font-size: 16px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.35s forwards;
+  }
+
+  .hero-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 40px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.5s forwards;
+  }
+
+  .nav-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 18px;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .nav-pill:hover, .nav-pill.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+
+  /* scroll indicator */
+  .scroll-hint {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.9s forwards;
+  }
+  .scroll-hint span { font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.15em; }
+  .scroll-line { width: 1px; height: 40px; background: linear-gradient(to bottom, var(--accent), transparent); animation: scrollPulse 2s infinite; }
+
+  /* ── SECTIONS ── */
+  section { max-width: 1100px; margin: 0 auto; padding: 80px 48px; }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-family: var(--font-head);
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 48px);
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    line-height: 1.1;
+  }
+
+  h3 {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+
+  p { color: var(--muted); margin-bottom: 16px; }
+  p strong { color: var(--text); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 64px 0; }
+
+  /* ── PATTERN TABS ── */
+  .tab-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 14px 8px;
+    background: var(--surface);
+    border: none;
+    color: var(--muted);
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-right: 1px solid var(--border);
+    letter-spacing: 0.02em;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: var(--accent); color: #000; }
+  .tab-btn:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fadeIn 0.3s forwards; }
+
+  /* ── HLD DIAGRAM ── */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 36px 24px;
+    margin: 28px 0;
+    overflow-x: auto;
+  }
+
+  svg.diagram {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  /* ── INFO GRID ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 28px 0;
+  }
+
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .info-card:hover { border-color: var(--accent); }
+
+  .card-icon { font-size: 22px; margin-bottom: 10px; }
+  .card-title { font-family: var(--font-head); font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 6px; }
+  .card-body { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+  }
+  .badge-green { background: rgba(90,255,206,0.15); color: var(--accent2); border: 1px solid rgba(90,255,206,0.3); }
+  .badge-red   { background: rgba(255,107,107,0.15); color: var(--accent3); border: 1px solid rgba(255,107,107,0.3); }
+  .badge-blue  { background: rgba(123,140,255,0.15); color: var(--accent4); border: 1px solid rgba(123,140,255,0.3); }
+  .badge-yellow{ background: rgba(232,255,90,0.15);  color: var(--accent);  border: 1px solid rgba(232,255,90,0.3); }
+
+  /* ── COMPANIES ── */
+  .company-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .company-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    color: var(--text);
+  }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 28px 0;
+  }
+
+  .compare-table th {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+  }
+
+  .compare-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align: top;
+  }
+
+  .compare-table tr:hover td { background: var(--surface); }
+
+  /* ── DECISION TOOL ── */
+  .decision-tool {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 36px;
+    margin-top: 28px;
+  }
+
+  .decision-question {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .decision-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .decision-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 14px 20px;
+    text-align: left;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .decision-btn:hover { border-color: var(--accent); background: rgba(232,255,90,0.05); }
+
+  .decision-result {
+    display: none;
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 3px;
+    border-left: 3px solid var(--accent);
+    background: rgba(232,255,90,0.05);
+  }
+  .decision-result.show { display: block; animation: fadeIn 0.3s; }
+  .result-pattern { font-family: var(--font-head); font-weight: 800; font-size: 24px; color: var(--accent); margin-bottom: 8px; }
+  .result-why { color: var(--muted); font-size: 14px; }
+
+  .reset-btn {
+    margin-top: 16px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── BEST CHOICE BANNER ── */
+  .best-banner {
+    background: linear-gradient(135deg, rgba(232,255,90,0.08), rgba(90,255,206,0.05));
+    border: 1px solid rgba(232,255,90,0.3);
+    border-radius: 4px;
+    padding: 36px;
+    margin: 40px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .best-banner::before {
+    content: '★ INDUSTRY VERDICT';
+    position: absolute;
+    top: 16px; right: 24px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+  }
+  .best-banner h3 { font-size: 24px; color: var(--accent); margin-bottom: 12px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  .appear {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .appear.in-view { opacity: 1; transform: none; }
+
+  @media (max-width: 640px) {
+    .hero, section { padding: 48px 20px; }
+    .tab-btn { font-size: 11px; padding: 12px 4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<div class="hero">
+  <p class="hero-tag">Microservices Architecture Deep-Dive</p>
+  <h1>Distributed<br><em>Transactions</em><br>Unpacked</h1>
+  <p class="hero-desc">
+    2PC · Saga · Choreography · Orchestration — every pattern explained with architecture diagrams, real-world examples, and a decision tool to pick the right one.
+  </p>
+  <div class="hero-nav">
+    <a class="nav-pill" href="#two-phase">2PC</a>
+    <a class="nav-pill" href="#saga">Saga</a>
+    <a class="nav-pill" href="#choreography">Choreography</a>
+    <a class="nav-pill" href="#orchestration">Orchestration</a>
+    <a class="nav-pill" href="#compare">Compare</a>
+    <a class="nav-pill" href="#decide">Decision Tool</a>
+    <a class="nav-pill" href="#industry">Industry Use</a>
+  </div>
+  <div class="scroll-hint">
+    <span>scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ THE PROBLEM ═══════════════ -->
+<section id="problem" class="appear">
+  <p class="section-label">01 — The Problem</p>
+  <h2>Why are distributed<br>transactions hard?</h2>
+  <p>In a monolith, a database transaction gives you ACID guarantees — Atomicity, Consistency, Isolation, Durability — for free. Microservices break this: each service owns its own database, so a business operation that spans services <strong>has no single transaction boundary</strong>.</p>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">Partial Failures</div>
+      <div class="card-body">Service A succeeds, Service B crashes halfway. Data is inconsistent with no automatic rollback.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">Network Partitions</div>
+      <div class="card-body">The CAP theorem forces a choice between Consistency and Availability during a partition.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">⏱</div>
+      <div class="card-title">Latency Amplification</div>
+      <div class="card-body">Cross-service locks compound latencies. Locking 3 services triples your worst-case wait time.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">📐</div>
+      <div class="card-title">No Single Truth</div>
+      <div class="card-body">Each service's DB has its own view. Achieving global consistency requires coordination protocols.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 2PC ═══════════════ -->
+<section id="two-phase" class="appear">
+  <p class="section-label">02 — Pattern 1</p>
+  <h2>Two-Phase Commit<br><em style="color:var(--accent4);font-style:normal">2PC</em></h2>
+  <p>The classic distributed transaction protocol. A <strong>Coordinator</strong> drives a two-step protocol across all participating services: <em>Prepare</em> then <em>Commit</em>.</p>
+
+  <!-- 2PC HLD Diagram -->
+  <div class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 760 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- BG lanes -->
+      <rect x="0" y="0" width="760" height="340" fill="#111318"/>
+      <!-- Phase labels -->
+      <text x="200" y="22" font-family="IBM Plex Mono" font-size="10" fill="#6b7280" letter-spacing="2">PHASE 1: PREPARE</text>
+      <text x="490" y="22" font-family="IBM Plex Mono" font-size="10" fill="#6b7280" letter-spacing="2">PHASE 2: COMMIT</text>
+      <line x1="420" y1="30" x2="420" y2="320" stroke="#22262f" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- Coordinator box -->
+      <rect x="300" y="45" width="160" height="48" rx="3" fill="#181b22" stroke="#e8ff5a" stroke-width="1.5"/>
+      <text x="380" y="64" font-family="Syne" font-size="12" font-weight="700" fill="#e8ff5a" text-anchor="middle">COORDINATOR</text>
+      <text x="380" y="82" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Transaction Manager</text>
+
+      <!-- Service A -->
+      <rect x="30" y="160" width="130" height="44" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.2"/>
+      <text x="95" y="179" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">SERVICE A</text>
+      <text x="95" y="195" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Orders DB</text>
+
+      <!-- Service B -->
+      <rect x="190" y="160" width="130" height="44" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.2"/>
+      <text x="255" y="179" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">SERVICE B</text>
+      <text x="255" y="195" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Inventory DB</text>
+
+      <!-- Service C -->
+      <rect x="350" y="160" width="130" height="44" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.2"/>
+      <text x="415" y="179" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">SERVICE C</text>
+      <text x="415" y="195" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Payment DB</text>
+
+      <!-- Coordinator → Services (Prepare) -->
+      <line x1="340" y1="93" x2="95" y2="160" stroke="#e8ff5a" stroke-width="1.2" marker-end="url(#arrowY)"/>
+      <line x1="365" y1="93" x2="255" y2="160" stroke="#e8ff5a" stroke-width="1.2" marker-end="url(#arrowY)"/>
+      <line x1="390" y1="93" x2="415" y2="160" stroke="#e8ff5a" stroke-width="1.2" marker-end="url(#arrowY)"/>
+
+      <!-- Labels on prepare arrows -->
+      <text x="185" y="122" font-family="IBM Plex Mono" font-size="9" fill="#e8ff5a">PREPARE?</text>
+
+      <!-- Services → Coordinator (Vote) -->
+      <line x1="95" y1="204" x2="340" y2="255" stroke="#5affce" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowC)"/>
+      <line x1="255" y1="204" x2="355" y2="255" stroke="#5affce" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowC)"/>
+      <line x1="415" y1="204" x2="415" y2="255" stroke="#5affce" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowC)"/>
+      <text x="170" y="248" font-family="IBM Plex Mono" font-size="9" fill="#5affce">VOTE: YES/NO</text>
+
+      <!-- Coordinator (Phase 2) -->
+      <rect x="300" y="255" width="160" height="44" rx="3" fill="#181b22" stroke="#e8ff5a" stroke-width="1.5"/>
+      <text x="380" y="273" font-family="Syne" font-size="11" font-weight="700" fill="#e8ff5a" text-anchor="middle">DECISION</text>
+      <text x="380" y="290" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">COMMIT or ROLLBACK</text>
+
+      <!-- Phase 2 commit to services -->
+      <rect x="520" y="160" width="130" height="44" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="585" y="179" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">SERVICE D</text>
+      <text x="585" y="195" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Notification DB</text>
+
+      <line x1="460" y1="270" x2="585" y2="204" stroke="#ff6b6b" stroke-width="1.2" marker-end="url(#arrowR)"/>
+      <text x="492" y="244" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b">COMMIT</text>
+
+      <!-- Lock symbols -->
+      <text x="95" y="240" font-family="IBM Plex Mono" font-size="14" fill="#e8ff5a" text-anchor="middle">🔒</text>
+      <text x="255" y="240" font-family="IBM Plex Mono" font-size="14" fill="#e8ff5a" text-anchor="middle">🔒</text>
+      <text x="415" y="240" font-family="IBM Plex Mono" font-size="14" fill="#e8ff5a" text-anchor="middle">🔒</text>
+
+      <!-- Note -->
+      <rect x="530" y="270" width="210" height="50" rx="2" fill="rgba(255,107,107,0.1)" stroke="rgba(255,107,107,0.3)" stroke-width="1"/>
+      <text x="635" y="289" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b" text-anchor="middle">⚠ BLOCKING LOCKS HELD</text>
+      <text x="635" y="305" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">during entire protocol</text>
+
+      <!-- Arrow defs -->
+      <defs>
+        <marker id="arrowY" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#e8ff5a"/>
+        </marker>
+        <marker id="arrowC" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#5affce"/>
+        </marker>
+        <marker id="arrowR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ff6b6b"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-title">How it works</div>
+      <div class="card-body">Phase 1: Coordinator asks all participants to <em>prepare</em> and lock resources. Phase 2: If all vote YES → COMMIT. If any votes NO → ROLLBACK all.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Pros</div>
+      <div class="card-body">
+        <span class="badge badge-green">ACID guarantees</span><br>
+        <span class="badge badge-green">Simple mental model</span><br>
+        <span class="badge badge-green">Strong consistency</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Cons</div>
+      <div class="card-body">
+        <span class="badge badge-red">Blocking locks</span><br>
+        <span class="badge badge-red">Single point of failure (coordinator)</span><br>
+        <span class="badge badge-red">High latency</span><br>
+        <span class="badge badge-red">Poor availability</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">When to use</div>
+      <div class="card-body">Financial systems, legacy DB integrations, or scenarios where <strong>strict consistency</strong> outweighs availability. Rarely used in modern cloud-native systems.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SAGA ═══════════════ -->
+<section id="saga" class="appear">
+  <p class="section-label">03 — Pattern 2</p>
+  <h2>The <em style="color:var(--accent);font-style:normal">Saga</em> Pattern</h2>
+  <p>A Saga breaks a long business transaction into a <strong>sequence of local transactions</strong>, each publishing events or messages. If any step fails, <strong>compensating transactions</strong> are triggered to undo previous steps — no distributed lock required.</p>
+
+  <div class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 780 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="780" height="260" fill="#111318"/>
+      <!-- Happy path label -->
+      <text x="20" y="22" font-family="IBM Plex Mono" font-size="10" fill="#5affce" letter-spacing="2">HAPPY PATH →</text>
+      <text x="20" y="210" font-family="IBM Plex Mono" font-size="10" fill="#ff6b6b" letter-spacing="2">COMPENSATION ← (on failure)</text>
+
+      <!-- Steps -->
+      <!-- Step 1: Order -->
+      <rect x="20" y="40" width="120" height="56" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.5"/>
+      <text x="80" y="62" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">ORDER</text>
+      <text x="80" y="78" font-family="Syne" font-size="9" fill="#6b7280" text-anchor="middle">SERVICE</text>
+      <text x="80" y="92" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">createOrder()</text>
+
+      <!-- Step 2: Payment -->
+      <rect x="175" y="40" width="120" height="56" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.5"/>
+      <text x="235" y="62" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">PAYMENT</text>
+      <text x="235" y="78" font-family="Syne" font-size="9" fill="#6b7280" text-anchor="middle">SERVICE</text>
+      <text x="235" y="92" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">chargeCard()</text>
+
+      <!-- Step 3: Inventory -->
+      <rect x="330" y="40" width="120" height="56" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.5"/>
+      <text x="390" y="62" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">INVENTORY</text>
+      <text x="390" y="78" font-family="Syne" font-size="9" fill="#6b7280" text-anchor="middle">SERVICE</text>
+      <text x="390" y="92" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">reserveStock()</text>
+
+      <!-- Step 4: Shipping -->
+      <rect x="485" y="40" width="120" height="56" rx="3" fill="#181b22" stroke="#5affce" stroke-width="1.5"/>
+      <text x="545" y="62" font-family="Syne" font-size="11" font-weight="700" fill="#5affce" text-anchor="middle">SHIPPING</text>
+      <text x="545" y="78" font-family="Syne" font-size="9" fill="#6b7280" text-anchor="middle">SERVICE</text>
+      <text x="545" y="92" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">scheduleShip()</text>
+
+      <!-- Step 5: Notify -->
+      <rect x="640" y="40" width="120" height="56" rx="3" fill="#181b22" stroke="#e8ff5a" stroke-width="1.5"/>
+      <text x="700" y="62" font-family="Syne" font-size="11" font-weight="700" fill="#e8ff5a" text-anchor="middle">NOTIFY</text>
+      <text x="700" y="78" font-family="Syne" font-size="9" fill="#6b7280" text-anchor="middle">SERVICE</text>
+      <text x="700" y="92" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">sendEmail()</text>
+
+      <!-- Forward arrows -->
+      <line x1="140" y1="68" x2="173" y2="68" stroke="#5affce" stroke-width="1.5" marker-end="url(#arrowC2)"/>
+      <line x1="295" y1="68" x2="328" y2="68" stroke="#5affce" stroke-width="1.5" marker-end="url(#arrowC2)"/>
+      <line x1="450" y1="68" x2="483" y2="68" stroke="#5affce" stroke-width="1.5" marker-end="url(#arrowC2)"/>
+      <line x1="605" y1="68" x2="638" y2="68" stroke="#5affce" stroke-width="1.5" marker-end="url(#arrowC2)"/>
+
+      <!-- Event labels -->
+      <text x="154" y="60" font-family="IBM Plex Mono" font-size="7" fill="#6b7280" text-anchor="middle">event</text>
+      <text x="309" y="60" font-family="IBM Plex Mono" font-size="7" fill="#6b7280" text-anchor="middle">event</text>
+      <text x="464" y="60" font-family="IBM Plex Mono" font-size="7" fill="#6b7280" text-anchor="middle">event</text>
+      <text x="619" y="60" font-family="IBM Plex Mono" font-size="7" fill="#6b7280" text-anchor="middle">event</text>
+
+      <!-- Failure marker -->
+      <circle cx="390" cy="68" r="6" fill="#ff6b6b" opacity="0.85"/>
+      <text x="390" y="73" font-family="Syne" font-size="8" font-weight="700" fill="#fff" text-anchor="middle">✕</text>
+      <text x="390" y="120" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b" text-anchor="middle">FAILURE HERE</text>
+      <line x1="390" y1="97" x2="390" y2="111" stroke="#ff6b6b" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- Compensations (backward arrows) -->
+      <line x1="328" y1="145" x2="295" y2="145" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowR2)"/>
+      <line x1="173" y1="145" x2="140" y2="145" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowR2)"/>
+      <text x="210" y="140" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b" text-anchor="middle">refundCard()</text>
+      <text x="55" y="140" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b" text-anchor="middle">cancelOrder()</text>
+
+      <!-- Compensation boxes -->
+      <rect x="20" y="150" width="120" height="36" rx="2" fill="rgba(255,107,107,0.08)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/>
+      <text x="80" y="173" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b" text-anchor="middle">COMPENSATE</text>
+      <rect x="175" y="150" width="120" height="36" rx="2" fill="rgba(255,107,107,0.08)" stroke="rgba(255,107,107,0.4)" stroke-width="1"/>
+      <text x="235" y="173" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b" text-anchor="middle">COMPENSATE</text>
+
+      <defs>
+        <marker id="arrowC2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#5affce"/>
+        </marker>
+        <marker id="arrowR2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ff6b6b"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <p><strong>Key insight:</strong> Sagas achieve <em>eventual consistency</em> through compensating transactions rather than rollbacks. The system must be designed so compensations are always possible (<em>idempotent</em> and <em>retryable</em>).</p>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-icon">✅</div>
+      <div class="card-title">Pros</div>
+      <div class="card-body">
+        <span class="badge badge-green">No distributed lock</span>
+        <span class="badge badge-green">High availability</span>
+        <span class="badge badge-green">Services stay loosely coupled</span>
+        <span class="badge badge-green">Works across polyglot DBs</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">Cons</div>
+      <div class="card-body">
+        <span class="badge badge-red">Eventually consistent only</span>
+        <span class="badge badge-red">Complex compensation logic</span>
+        <span class="badge badge-red">Hard to debug</span>
+        <span class="badge badge-red">Cyclic dependency risk</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Sagas come in two flavours — <strong>Choreography</strong> and <strong>Orchestration</strong> — covered in depth next.</p>
+</section>
+
+<!-- ═══════════════ CHOREOGRAPHY ═══════════════ -->
+<section id="choreography" class="appear">
+  <p class="section-label">04 — Saga Variant A</p>
+  <h2>Choreography<br><em style="color:var(--accent2);font-style:normal">Event-Driven</em></h2>
+  <p>No central coordinator. Each service <strong>listens for events</strong> on a message broker (Kafka, RabbitMQ) and reacts by performing its local transaction and publishing the next event.</p>
+
+  <div class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 760 310" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="310" fill="#111318"/>
+
+      <!-- Message Bus -->
+      <rect x="20" y="135" width="720" height="40" rx="3" fill="rgba(90,255,206,0.06)" stroke="#5affce" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="380" y="160" font-family="Syne" font-size="12" font-weight="700" fill="#5affce" text-anchor="middle">MESSAGE BUS / EVENT STREAM  (Kafka / RabbitMQ / SNS)</text>
+
+      <!-- Services across top -->
+      <rect x="20" y="30" width="110" height="50" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="75" y="52" font-family="Syne" font-size="10" font-weight="700" fill="#7b8cff" text-anchor="middle">ORDER SVC</text>
+      <text x="75" y="68" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">publishes</text>
+
+      <rect x="165" y="30" width="110" height="50" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="220" y="52" font-family="Syne" font-size="10" font-weight="700" fill="#7b8cff" text-anchor="middle">PAYMENT SVC</text>
+      <text x="220" y="68" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">listens + publishes</text>
+
+      <rect x="310" y="30" width="120" height="50" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="370" y="52" font-family="Syne" font-size="10" font-weight="700" fill="#7b8cff" text-anchor="middle">INVENTORY SVC</text>
+      <text x="370" y="68" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">listens + publishes</text>
+
+      <rect x="460" y="30" width="120" height="50" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="520" y="52" font-family="Syne" font-size="10" font-weight="700" fill="#7b8cff" text-anchor="middle">SHIPPING SVC</text>
+      <text x="520" y="68" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">listens + publishes</text>
+
+      <rect x="610" y="30" width="120" height="50" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="670" y="52" font-family="Syne" font-size="10" font-weight="700" fill="#7b8cff" text-anchor="middle">NOTIFY SVC</text>
+      <text x="670" y="68" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">listens</text>
+
+      <!-- Arrows up to bus -->
+      <line x1="75" y1="80" x2="75" y2="135" stroke="#7b8cff" stroke-width="1.2" marker-end="url(#arrowB)"/>
+      <line x1="220" y1="80" x2="220" y2="135" stroke="#7b8cff" stroke-width="1.2" marker-end="url(#arrowB)"/>
+      <line x1="370" y1="80" x2="370" y2="135" stroke="#7b8cff" stroke-width="1.2" marker-end="url(#arrowB)"/>
+      <line x1="520" y1="80" x2="520" y2="135" stroke="#7b8cff" stroke-width="1.2" marker-end="url(#arrowB)"/>
+      <line x1="670" y1="80" x2="670" y2="135" stroke="#7b8cff" stroke-width="1.2" marker-end="url(#arrowB)"/>
+
+      <!-- Events on bus -->
+      <rect x="55" y="140" width="88" height="28" rx="2" fill="rgba(232,255,90,0.1)" stroke="rgba(232,255,90,0.4)" stroke-width="1"/>
+      <text x="99" y="158" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">OrderCreated</text>
+
+      <rect x="185" y="140" width="88" height="28" rx="2" fill="rgba(232,255,90,0.1)" stroke="rgba(232,255,90,0.4)" stroke-width="1"/>
+      <text x="229" y="158" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">PaymentDone</text>
+
+      <rect x="325" y="140" width="88" height="28" rx="2" fill="rgba(232,255,90,0.1)" stroke="rgba(232,255,90,0.4)" stroke-width="1"/>
+      <text x="369" y="158" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">StockReserved</text>
+
+      <rect x="460" y="140" width="100" height="28" rx="2" fill="rgba(232,255,90,0.1)" stroke="rgba(232,255,90,0.4)" stroke-width="1"/>
+      <text x="510" y="158" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">ShipScheduled</text>
+
+      <!-- Arrows down to next consumer -->
+      <line x1="229" y1="175" x2="229" y2="200" stroke="#5affce" stroke-width="1.2" marker-end="url(#arrowC3)"/>
+      <line x1="369" y1="175" x2="369" y2="200" stroke="#5affce" stroke-width="1.2" marker-end="url(#arrowC3)"/>
+      <line x1="510" y1="175" x2="510" y2="200" stroke="#5affce" stroke-width="1.2" marker-end="url(#arrowC3)"/>
+      <line x1="670" y1="175" x2="670" y2="200" stroke="#5affce" stroke-width="1.2" marker-end="url(#arrowC3)"/>
+
+      <!-- Consumer boxes -->
+      <rect x="175" y="200" width="110" height="36" rx="2" fill="#181b22" stroke="#5affce" stroke-width="1"/>
+      <text x="230" y="222" font-family="IBM Plex Mono" font-size="9" fill="#5affce" text-anchor="middle">handles event</text>
+      <rect x="310" y="200" width="120" height="36" rx="2" fill="#181b22" stroke="#5affce" stroke-width="1"/>
+      <text x="370" y="222" font-family="IBM Plex Mono" font-size="9" fill="#5affce" text-anchor="middle">handles event</text>
+      <rect x="460" y="200" width="120" height="36" rx="2" fill="#181b22" stroke="#5affce" stroke-width="1"/>
+      <text x="520" y="222" font-family="IBM Plex Mono" font-size="9" fill="#5affce" text-anchor="middle">handles event</text>
+      <rect x="610" y="200" width="120" height="36" rx="2" fill="#181b22" stroke="#5affce" stroke-width="1"/>
+      <text x="670" y="222" font-family="IBM Plex Mono" font-size="9" fill="#5affce" text-anchor="middle">handles event</text>
+
+      <!-- No coordinator label -->
+      <text x="380" y="290" font-family="IBM Plex Mono" font-size="10" fill="#ff6b6b" text-anchor="middle">⚡ NO CENTRAL COORDINATOR — Services are fully autonomous</text>
+
+      <defs>
+        <marker id="arrowB" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#7b8cff"/>
+        </marker>
+        <marker id="arrowC3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#5affce"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-icon">📡</div>
+      <div class="card-title">Core mechanics</div>
+      <div class="card-body">Services publish domain events. Other services subscribe and react. The workflow emerges from the interactions — no single service "owns" the saga.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">✅</div>
+      <div class="card-title">Strengths</div>
+      <div class="card-body">
+        <span class="badge badge-green">Truly decoupled</span>
+        <span class="badge badge-green">Scales independently</span>
+        <span class="badge badge-green">No single point of failure</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">Challenges</div>
+      <div class="card-body">
+        <span class="badge badge-red">Hard to visualize flow</span>
+        <span class="badge badge-red">Event schema coupling</span>
+        <span class="badge badge-red">Distributed tracing needed</span>
+        <span class="badge badge-red">Risk of cyclic events</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">🏢</div>
+      <div class="card-title">Best for</div>
+      <div class="card-body">Simple, linear workflows; teams that value independence; systems where each service team owns its full lifecycle. Under ~4–5 steps.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ ORCHESTRATION ═══════════════ -->
+<section id="orchestration" class="appear">
+  <p class="section-label">05 — Saga Variant B</p>
+  <h2>Orchestration<br><em style="color:var(--accent3);font-style:normal">Command-Driven</em></h2>
+  <p>A dedicated <strong>Saga Orchestrator</strong> (or Process Manager) sits in the middle. It sends commands to services and waits for responses. It holds the full state of the workflow.</p>
+
+  <div class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 760 330" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="760" height="330" fill="#111318"/>
+
+      <!-- Central orchestrator -->
+      <rect x="280" y="115" width="200" height="70" rx="4" fill="#181b22" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="380" y="143" font-family="Syne" font-size="13" font-weight="800" fill="#ff6b6b" text-anchor="middle">SAGA ORCHESTRATOR</text>
+      <text x="380" y="162" font-family="IBM Plex Mono" font-size="9" fill="#6b7280" text-anchor="middle">Process Manager / State Machine</text>
+      <text x="380" y="177" font-family="IBM Plex Mono" font-size="8" fill="#e8ff5a" text-anchor="middle">Owns workflow state</text>
+
+      <!-- Services around it -->
+      <!-- Top: Order -->
+      <rect x="310" y="20" width="140" height="48" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="380" y="42" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">ORDER SERVICE</text>
+      <text x="380" y="58" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">createOrder()</text>
+
+      <!-- Left: Payment -->
+      <rect x="20" y="125" width="140" height="48" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="90" y="147" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">PAYMENT SVC</text>
+      <text x="90" y="163" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">chargeCard()</text>
+
+      <!-- Right: Inventory -->
+      <rect x="600" y="125" width="140" height="48" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="670" y="147" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">INVENTORY SVC</text>
+      <text x="670" y="163" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">reserveStock()</text>
+
+      <!-- Bottom-left: Shipping -->
+      <rect x="120" y="260" width="140" height="48" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="190" y="282" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">SHIPPING SVC</text>
+      <text x="190" y="298" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">scheduleShip()</text>
+
+      <!-- Bottom-right: Notify -->
+      <rect x="500" y="260" width="140" height="48" rx="3" fill="#181b22" stroke="#7b8cff" stroke-width="1.2"/>
+      <text x="570" y="282" font-family="Syne" font-size="11" font-weight="700" fill="#7b8cff" text-anchor="middle">NOTIFY SVC</text>
+      <text x="570" y="298" font-family="IBM Plex Mono" font-size="8" fill="#6b7280" text-anchor="middle">sendEmail()</text>
+
+      <!-- Command arrows: Orch → services -->
+      <line x1="380" y1="115" x2="380" y2="68" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#arrowRR)"/>
+      <line x1="280" y1="150" x2="160" y2="150" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#arrowRR)"/>
+      <line x1="480" y1="150" x2="598" y2="150" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#arrowRR)"/>
+      <line x1="330" y1="185" x2="250" y2="260" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#arrowRR)"/>
+      <line x1="430" y1="185" x2="530" y2="260" stroke="#ff6b6b" stroke-width="1.5" marker-end="url(#arrowRR)"/>
+
+      <!-- Command labels -->
+      <text x="395" y="100" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b">CMD</text>
+      <text x="200" y="145" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b">CMD</text>
+      <text x="505" y="145" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b">CMD</text>
+      <text x="258" y="235" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b">CMD</text>
+      <text x="465" y="240" font-family="IBM Plex Mono" font-size="8" fill="#ff6b6b">CMD</text>
+
+      <!-- Reply arrows: services → Orch (dashed) -->
+      <line x1="375" y1="68" x2="375" y2="115" stroke="#5affce" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowC4)"/>
+      <line x1="155" y1="155" x2="278" y2="155" stroke="#5affce" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowC4)"/>
+      <line x1="598" y1="155" x2="482" y2="155" stroke="#5affce" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowC4)"/>
+      <line x1="245" y1="265" x2="335" y2="190" stroke="#5affce" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowC4)"/>
+      <line x1="525" y1="265" x2="435" y2="190" stroke="#5affce" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowC4)"/>
+
+      <text x="20" y="320" font-family="IBM Plex Mono" font-size="9" fill="#ff6b6b">→ CMD = command</text>
+      <text x="140" y="320" font-family="IBM Plex Mono" font-size="9" fill="#5affce">- - → reply/event</text>
+
+      <defs>
+        <marker id="arrowRR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ff6b6b"/>
+        </marker>
+        <marker id="arrowC4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#5affce"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-icon">🎯</div>
+      <div class="card-title">Core mechanics</div>
+      <div class="card-body">Orchestrator sends explicit commands; services reply with results. The orchestrator decides the next step, handles errors, and triggers compensations centrally.</div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">✅</div>
+      <div class="card-title">Strengths</div>
+      <div class="card-body">
+        <span class="badge badge-green">Clear, visible workflow</span>
+        <span class="badge badge-green">Centralized error handling</span>
+        <span class="badge badge-green">Easy to audit & debug</span>
+        <span class="badge badge-green">Handles complex branching</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">Challenges</div>
+      <div class="card-body">
+        <span class="badge badge-red">Orchestrator is a bottleneck</span>
+        <span class="badge badge-red">Can become god object</span>
+        <span class="badge badge-red">Couples orchestrator to all services</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-icon">🏢</div>
+      <div class="card-title">Best for</div>
+      <div class="card-body">Complex, multi-step workflows with branching/retry logic. Regulated industries (fintech, healthcare) needing audit trails. Workflows with 5+ steps.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ COMPARISON TABLE ═══════════════ -->
+<section id="compare" class="appear">
+  <p class="section-label">06 — Side-by-Side</p>
+  <h2>Pattern<br>Comparison</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>2PC</th>
+        <th>Saga (Choreography)</th>
+        <th>Saga (Orchestration)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:var(--text)">Consistency</strong></td>
+        <td><span class="badge badge-green">Strong (ACID)</span></td>
+        <td><span class="badge badge-yellow">Eventual</span></td>
+        <td><span class="badge badge-yellow">Eventual</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Availability</strong></td>
+        <td><span class="badge badge-red">Low (locks block)</span></td>
+        <td><span class="badge badge-green">High</span></td>
+        <td><span class="badge badge-green">High</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Coupling</strong></td>
+        <td>Coordinator ↔ all participants</td>
+        <td>Via event schema only</td>
+        <td>Orchestrator ↔ all services</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Complexity</strong></td>
+        <td>Low logic, high infra</td>
+        <td>Medium — implicit flow</td>
+        <td>Medium — explicit but centralized</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Observability</strong></td>
+        <td>Easy — one coordinator log</td>
+        <td>Hard — distributed tracing required</td>
+        <td>Easy — orchestrator is source of truth</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Failure handling</strong></td>
+        <td>Automatic rollback</td>
+        <td>Manual compensating transactions</td>
+        <td>Centralized compensation logic</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Scalability</strong></td>
+        <td><span class="badge badge-red">Poor</span></td>
+        <td><span class="badge badge-green">Excellent</span></td>
+        <td><span class="badge badge-green">Good</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Best workflow size</strong></td>
+        <td>2–3 services max</td>
+        <td>3–5 linear steps</td>
+        <td>5+ steps with branching</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text)">Tools</strong></td>
+        <td>XA, JTA, PostgreSQL</td>
+        <td>Kafka, RabbitMQ, EventBridge</td>
+        <td>Temporal, Conductor, Axon, AWS Step Functions</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════ INDUSTRY USE ═══════════════ -->
+<section id="industry" class="appear">
+  <p class="section-label">07 — Real World</p>
+  <h2>What Top Tech<br>Companies Use</h2>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="card-title">Uber</div>
+      <div class="card-body">Uses <strong>Orchestration</strong> via their in-house <em>Cadence</em> workflow engine (now open-sourced as <em>Temporal</em>). Trip lifecycle — rider match, driver dispatch, payment, receipt — is a saga orchestrated as a durable state machine.</div>
+      <div class="company-row">
+        <span class="company-chip">Temporal/Cadence</span>
+        <span class="company-chip">Orchestration</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Netflix</div>
+      <div class="card-body">Heavy <strong>Choreography</strong> via Kafka. Each domain service reacts to events (stream started, billing event, encoding complete). They prioritize availability over strict consistency.</div>
+      <div class="company-row">
+        <span class="company-chip">Kafka</span>
+        <span class="company-chip">Choreography</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Amazon</div>
+      <div class="card-body">Uses <strong>both</strong>. Order fulfillment uses saga choreography (events between warehouse, payment, shipping). Internal workflows use AWS Step Functions (orchestration).</div>
+      <div class="company-row">
+        <span class="company-chip">SNS/SQS</span>
+        <span class="company-chip">Step Functions</span>
+        <span class="company-chip">Hybrid</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Stripe</div>
+      <div class="card-body">Payment workflows use <strong>Orchestration</strong> with idempotency keys. Complex payment retry logic, dispute handling, and payout flows need explicit state management and auditability.</div>
+      <div class="company-row">
+        <span class="company-chip">Orchestration</span>
+        <span class="company-chip">Idempotent</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">LinkedIn</div>
+      <div class="card-body">Built on <strong>Kafka</strong> — the company open-sourced it. Feed updates, connection events, and notifications all flow as choreographed sagas through event streams.</div>
+      <div class="company-row">
+        <span class="company-chip">Kafka</span>
+        <span class="company-chip">Choreography</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="card-title">Airbnb</div>
+      <div class="card-body">Booking flow (search → hold → payment → confirm → notify host) uses a <strong>saga orchestration</strong> with compensation logic for each failure point.</div>
+      <div class="company-row">
+        <span class="company-chip">Orchestration</span>
+        <span class="company-chip">Saga</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Best choice banner -->
+  <div class="best-banner appear">
+    <h3>🏆 The Industry Consensus (2024–2025)</h3>
+    <p><strong>Saga Orchestration via Temporal / AWS Step Functions is the dominant choice</strong> for new systems handling complex business workflows. It offers the best tradeoff: observable state, manageable compensations, good scalability, and battle-tested tooling.</p>
+    <p>Choreography wins for <strong>high-throughput, decoupled domains</strong> (event pipelines, analytics, notifications) where the workflow is simple and teams want full autonomy.</p>
+    <p>2PC is effectively <strong>legacy</strong> for microservices — only justified when integrating with older RDBMS systems that mandate XA transactions.</p>
+    <div style="margin-top:16px;">
+      <span class="badge badge-yellow">Orchestration (Temporal)</span> for complex flows &nbsp;
+      <span class="badge badge-green">Choreography (Kafka)</span> for event pipelines &nbsp;
+      <span class="badge badge-red">2PC</span> only for legacy
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ DECISION TOOL ═══════════════ -->
+<section id="decide" class="appear">
+  <p class="section-label">08 — Interactive</p>
+  <h2>Which Pattern<br>Should You Use?</h2>
+  <p>Answer the questions below and get a recommendation.</p>
+
+  <div class="decision-tool" id="dtool">
+    <div id="q1">
+      <p class="decision-question">1. Do you need strict ACID consistency (no eventual consistency allowed)?</p>
+      <div class="decision-options">
+        <button class="decision-btn" onclick="answer(1,'yes')">Yes — hard regulatory requirement (e.g., banking ledger)</button>
+        <button class="decision-btn" onclick="answer(1,'no')">No — eventual consistency is fine (most modern systems)</button>
+      </div>
+    </div>
+    <div id="q2" style="display:none">
+      <p class="decision-question">2. How complex is your workflow?</p>
+      <div class="decision-options">
+        <button class="decision-btn" onclick="answer(2,'simple')">Simple & linear — 2–4 steps, no branching</button>
+        <button class="decision-btn" onclick="answer(2,'complex')">Complex — 5+ steps, conditional branches, retries, timeouts</button>
+      </div>
+    </div>
+    <div id="q3" style="display:none">
+      <p class="decision-question">3. What matters more to your team?</p>
+      <div class="decision-options">
+        <button class="decision-btn" onclick="answer(3,'autonomy')">Service autonomy — teams deploy independently, no shared coordinator</button>
+        <button class="decision-btn" onclick="answer(3,'visibility')">Visibility & control — central audit trail, easy debugging</button>
+      </div>
+    </div>
+
+    <div class="decision-result" id="dresult">
+      <div class="result-pattern" id="dpattern"></div>
+      <div class="result-why" id="dwhy"></div>
+      <button class="reset-btn" onclick="resetDecision()">↩ Start over</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer style="text-align:center; padding:48px 24px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:11px; color:var(--muted);">
+  Distributed Transactions Reference Guide &nbsp;·&nbsp; Patterns: 2PC · Saga · Choreography · Orchestration
+</footer>
+
+<script>
+  // ── Intersection observer for appear animations ──
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in-view'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.appear').forEach(el => obs.observe(el));
+
+  // ── Smooth scroll ──
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const el = document.querySelector(a.getAttribute('href'));
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // ── Decision tool ──
+  let answers = {};
+
+  function answer(q, val) {
+    answers[q] = val;
+    document.getElementById('q' + q).style.opacity = '0.4';
+
+    if (q === 1 && val === 'yes') return showResult('2PC (Two-Phase Commit)', 'You need strict ACID guarantees. 2PC with XA transactions is your only option. Keep the participant count small (≤ 3 services) and accept the availability trade-off.');
+    if (q === 1 && val === 'no') { showQ(2); return; }
+    if (q === 2 && val === 'complex') return showResult('Saga — Orchestration', 'Complex flows with branching and retries need a central state machine. Use Temporal, AWS Step Functions, or Netflix Conductor. This is what Uber, Airbnb, and Stripe use.');
+    if (q === 2 && val === 'simple') { showQ(3); return; }
+    if (q === 3 && val === 'autonomy') return showResult('Saga — Choreography', 'Teams want independence. Use Kafka or RabbitMQ. Each service publishes events and reacts to others with no shared coordinator. Used heavily by Netflix and LinkedIn. Invest in distributed tracing (Jaeger/Zipkin).');
+    if (q === 3 && val === 'visibility') return showResult('Saga — Orchestration', 'You want a clear audit trail and centralized failure handling. An orchestrator (Temporal, Conductor, or AWS Step Functions) gives you a dashboard for every running workflow instance.');
+  }
+
+  function showQ(n) {
+    const el = document.getElementById('q' + n);
+    el.style.display = 'block';
+    el.style.animation = 'fadeIn 0.3s';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showResult(pattern, why) {
+    document.getElementById('dpattern').textContent = '→ ' + pattern;
+    document.getElementById('dwhy').textContent = why;
+    const r = document.getElementById('dresult');
+    r.classList.add('show');
+    r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function resetDecision() {
+    answers = {};
+    ['q2','q3'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.display = 'none';
+      el.style.opacity = '1';
+    });
+    document.getElementById('q1').style.opacity = '1';
+    document.getElementById('dresult').classList.remove('show');
+  }
+</script>
+</body>
+</html>
